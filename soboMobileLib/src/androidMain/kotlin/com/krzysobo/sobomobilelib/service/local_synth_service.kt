@@ -6,7 +6,6 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
-import androidx.compose.runtime.Composable
 import com.krzysobo.sobomobilelib.viewmodel.PhraseToTalk
 import java.io.File
 import java.util.Locale
@@ -47,7 +46,7 @@ class FreeTextUtteranceProgressListener(
 }
 
 
-class TalkService {
+class LocalSynthService {
     var defaultSpeechLang = "en"
     var speechLang = ""
 
@@ -62,7 +61,7 @@ class TalkService {
 
     fun setLanguage(lang: String): Boolean {
         val resLangSetting = tts.setLanguage(Locale.forLanguageTag(lang))
-        Log.d("SPEECH_VIEWX", "====> TalkService.setLanguage: lang: $lang RESULT: $resLangSetting")
+        Log.d("SPEECH_VIEWX", "====> LocalSynthService.setLanguage: lang: $lang RESULT: $resLangSetting")
         if (resLangSetting in listOf(
                 TextToSpeech.LANG_MISSING_DATA,
                 TextToSpeech.LANG_NOT_SUPPORTED
@@ -70,13 +69,13 @@ class TalkService {
         ) {
             Log.e(
                 "SPEECH_VIEWX",
-                "====> TalkService.setLanguage: lang: $lang RESULT: $resLangSetting - FAILED!!!"
+                "====> LocalSynthService.setLanguage: lang: $lang RESULT: $resLangSetting - FAILED!!!"
             )
             return false
         } else {
             Log.d(
                 "SPEECH_VIEWX",
-                "====> TalkService.setLanguage: lang: $lang RESULT: $resLangSetting - OK!!!"
+                "====> LocalSynthService.setLanguage: lang: $lang RESULT: $resLangSetting - OK!!!"
             )
             return true
         }
