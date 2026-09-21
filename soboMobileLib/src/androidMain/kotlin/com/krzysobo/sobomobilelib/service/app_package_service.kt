@@ -24,29 +24,20 @@ class AppPackageService {
     val FILTER_MODE_EXCLUDE_SELECTED = 20
 
     @Composable
-    fun getAllPackagesListAppItems(
-        context: Context,
-        appOwnPackageNameToOmit: String,
-    ): List<AppItem> {
-        return getFilteredPackagesListAppItems(
-            context,
-            listOf(),
-            FILTER_MODE_GET_ALL,
-            appOwnPackageNameToOmit
-        )
-    }
-
-    @Composable
     fun getSelectedPackagesListAppItems(
         context: Context,
         pkgNames: List<String>,
         appOwnPackageNameToOmit: String,
+        appOtherPackageNamesToOmit: List<String> = listOf(),
+        appPackagesToBePrivileged: List<String> = listOf(),
     ): List<AppItem> {
         return getFilteredPackagesListAppItems(
             context,
             pkgNames,
             FILTER_MODE_INCLUDE_SELECTED,
-            appOwnPackageNameToOmit
+            appOwnPackageNameToOmit,
+            appOtherPackageNamesToOmit,
+            appPackagesToBePrivileged,
         )
     }
 
@@ -55,12 +46,17 @@ class AppPackageService {
         context: Context,
         pkgNames: List<String>,
         appOwnPackageNameToOmit: String,
+        appOtherPackageNamesToOmit: List<String> = listOf(),
+        appPackagesToBePrivileged: List<String> = listOf(),
+
     ): List<AppItem> {
         return getFilteredPackagesListAppItems(
             context,
             pkgNames,
             FILTER_MODE_EXCLUDE_SELECTED,
-            appOwnPackageNameToOmit
+            appOwnPackageNameToOmit,
+            appOtherPackageNamesToOmit,
+            appPackagesToBePrivileged,
         )
     }
 
@@ -70,9 +66,13 @@ class AppPackageService {
         filteredPackageNames: List<String>,
         filterMode: Int,
         appOwnPackageNameToOmit: String = "",
+        appOtherPackageNamesToOmit: List<String> = listOf(),
+        appPackagesToBePrivileged: List<String> = listOf(),
     ): List<AppItem> {
         var resultPackages: MutableList<AppItem> = mutableListOf()
         val allAppItems = getPackagesListAsAppItems(context, appOwnPackageNameToOmit)
+        var privilegedAppItems: MutableList<AppItem> = mutableListOf()
+
         for (appItem in allAppItems) {
             if (
                 (filterMode == FILTER_MODE_GET_ALL) ||
@@ -81,11 +81,22 @@ class AppPackageService {
                 ((filterMode == FILTER_MODE_EXCLUDE_SELECTED) &&
                         (appItem.packageName !in filteredPackageNames))
             ) {
-                resultPackages.add(appItem)
+                if (appOtherPackageNamesToOmit.contains(appItem.packageName)) {
+                    continue
+                }
+                if (appPackagesToBePrivileged.contains(appItem.packageName)) {
+                    privilegedAppItems.add(appItem)
+                } else {
+                    resultPackages.add(appItem)
+                }
             }
         }
 
-        return resultPackages
+        if (privilegedAppItems.isNotEmpty()) {
+            return privilegedAppItems + resultPackages
+        } else {
+            return resultPackages
+        }
     }
 
     @Composable
