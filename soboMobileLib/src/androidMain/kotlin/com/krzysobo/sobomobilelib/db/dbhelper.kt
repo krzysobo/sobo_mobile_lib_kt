@@ -23,11 +23,19 @@ abstract class DBHelper(
     // ================== OVERRIDDEN "TECHNICAL" METHODS ======================
     // Called when the database is created for the first time
 
+    // settings are read many times per frame - opening the database file for each read (and never
+    // closing it) cost seconds on screen switches and leaked a connection per read. One read-only
+    // connection is reused instead; it still sees writes of other connections and processes.
+    private var cachedReadableDatabase: SQLiteDatabase? = null
+
+    @Synchronized
     override fun getReadableDatabase(): SQLiteDatabase {
+        cachedReadableDatabase?.let { if (it.isOpen) return it }
+
         val dbFile = getDbFile()
 //        Log.d("DB", "DBDBDB -- READABLE -- absolute path ${dbFile.absolutePath}")
 
-        return if (dbFile.exists()) {
+        val db = if (dbFile.exists()) {
             SQLiteDatabase.openDatabase(
                 dbFile.absolutePath, null,
                 SQLiteDatabase.OPEN_READONLY
@@ -35,6 +43,8 @@ abstract class DBHelper(
         } else {
             super.getReadableDatabase()
         }
+        cachedReadableDatabase = db
+        return db
     }
 
     override fun getWritableDatabase(): SQLiteDatabase {
@@ -51,6 +61,8 @@ abstract class DBHelper(
             db.close() // Close the default DB
             val newDb = SQLiteDatabase.openOrCreateDatabase(dbFile.absolutePath, null)
             onCreate(newDb)
+            // a cached read connection may point to the default DB - read the new file from now on
+            synchronized(this) { cachedReadableDatabase = null }
             newDb
         }
     }

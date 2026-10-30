@@ -6,9 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Tv
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.krzysobo.soboapptpl.service.AnyRes
 import com.krzysobo.sobomobilelib.viewmodel.AppItem
@@ -104,8 +104,64 @@ class AppPackageService {
         context: Context,
         appOwnPackageNameToOmit: String,
     ): List<AppItem> {
-        var appsOut: MutableList<AppItem> = mutableListOf()
-        val pkgs = getPackagesList(context)
+        // the PackageManager queries and label/icon loading take hundreds of ms on a TV box - do
+        // them once per screen, not on every recomposition of the calling composable
+        val launchableApps = remember(context, appOwnPackageNameToOmit) {
+            getLaunchableAppsCached(context, appOwnPackageNameToOmit)
+        }
+
+        return launchableApps.map { app ->
+            AppItem(
+                title = AnyRes(app.label),
+                image = AnyImage(rememberDrawablePainter(app.icon)),
+                packageName = app.packageName,
+                launchIntent = app.launchIntent
+            )
+        }
+    }
+
+    private fun getLaunchableAppsCached(
+        context: Context,
+        appOwnPackageNameToOmit: String,
+    ): List<LaunchableApp> = synchronized(AppPackageService) {
+        val nowMs = SystemClock.uptimeMillis()
+        val cached = launchableAppsCache
+        if (cached != null && cached.ownPackageNameToOmit == appOwnPackageNameToOmit &&
+            nowMs - cached.createdAtMs < LAUNCHABLE_APPS_CACHE_MS
+        ) {
+            return cached.apps
+        }
+        val apps = queryLaunchableApps(context, appOwnPackageNameToOmit)
+        launchableAppsCache = LaunchableAppsCache(appOwnPackageNameToOmit, nowMs, apps)
+        apps
+    }
+
+    private class LaunchableAppsCache(
+        val ownPackageNameToOmit: String,
+        val createdAtMs: Long,
+        val apps: List<LaunchableApp>,
+    )
+
+    companion object {
+        // shared by all screens: the settings show the same list in two rows, and the screens
+        // are rebuilt on every switch between the user and the settings mode. Newly installed
+        // apps appear within a minute.
+        private const val LAUNCHABLE_APPS_CACHE_MS = 60_000L
+        private var launchableAppsCache: LaunchableAppsCache? = null
+    }
+
+    private class LaunchableApp(
+        val label: String,
+        val icon: Drawable,
+        val packageName: String,
+        val launchIntent: Intent,
+    )
+
+    private fun queryLaunchableApps(
+        context: Context,
+        appOwnPackageNameToOmit: String,
+    ): List<LaunchableApp> {
+        var appsOut: MutableList<LaunchableApp> = mutableListOf()
 
 //    val apps = context.packageManager.getInstalledApplications(PackageManager.MATCH_ALL)
 
@@ -123,9 +179,7 @@ class AppPackageService {
                     ))
                 .distinctBy { it.activityInfo.packageName }
 
-        val defaultIcon = AnyImage(Icons.Default.Tv)
-        // for ((index, app) in apps.withIndex()) {
-        for ((index, resolveInfo) in resolveInfos.withIndex()) {
+        for (resolveInfo in resolveInfos) {
             val packageInfo = context.packageManager.getPackageInfo(
                 resolveInfo.activityInfo.packageName,
                 0
@@ -135,10 +189,8 @@ class AppPackageService {
                 continue
             }
 
-            val appName = appInfo.name
             val appLabel = context.packageManager.getApplicationLabel(appInfo)
             val appIcon: Drawable = context.packageManager.getApplicationIcon(appInfo)
-            val appIconPainter = rememberDrawablePainter(appIcon)
             println("RESOLVEINTENT - PACKAGE: ${resolveInfo.activityInfo.packageName} ACTIV: ${resolveInfo.activityInfo.name}")
             val launchIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
@@ -151,16 +203,14 @@ class AppPackageService {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
-//        val iconOut = defaultIcon
-            val appItem = AppItem(
-//            title = AnyRes("$index:: $appName:: $appLabel"),
-                title = AnyRes("$appLabel"),
-                image = AnyImage(appIconPainter),
-                packageName = appInfo.packageName,
-                launchIntent = launchIntent
+            appsOut.add(
+                LaunchableApp(
+                    label = "$appLabel",
+                    icon = appIcon,
+                    packageName = appInfo.packageName,
+                    launchIntent = launchIntent
+                )
             )
-
-            appsOut.add(appItem)
         }
 
         return appsOut
