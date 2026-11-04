@@ -38,6 +38,34 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
+        // ===== tests =====
+        getByName("commonTest") {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("desktopTest") {
+            dependencies {
+                implementation(libs.kotlin.test.junit)
+            }
+        }
+        // JVM tests of the Android code (Robolectric). The sources live in src/androidHostTest - the
+        // source set name used by AGP 9 - so that the test files are the same on both build stacks.
+        getByName("androidUnitTest") {
+            kotlin.srcDir("src/androidHostTest/kotlin")
+            dependencies {
+                implementation(libs.junit)
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.robolectric)
+                implementation(libs.androidx.test.core)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.androidx.compose.ui.test.junit4)
+                implementation(libs.androidx.compose.ui.test.manifest)
+            }
+        }
+        // ===== /tests =====
+
         val commonMain by getting {
             dependencies {
                 implementation(compose.runtime)
@@ -77,6 +105,11 @@ kotlin {
 }
 
 android {
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true   // Robolectric: Android resources, manifest, assets
+        }
+    }
     compileSdk = 35
     namespace = "com.krzysobo.sobomobilelib"
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
