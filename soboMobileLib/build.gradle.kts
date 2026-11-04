@@ -35,6 +35,10 @@ kotlin {
         androidResources {
             enable = true
         }
+        // JVM tests of the Android code (Robolectric) - src/androidHostTest
+        withHostTest {
+            isIncludeAndroidResources = true   // Robolectric: Android resources, manifest, assets
+        }
     }
 
 //    androidTarget {
@@ -44,6 +48,31 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
+        // ===== tests =====
+        getByName("commonTest") {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+        getByName("desktopTest") {
+            dependencies {
+                implementation(libs.kotlin.test.junit)
+            }
+        }
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(libs.junit)
+                implementation(libs.kotlin.test.junit)
+                implementation(libs.robolectric)
+                implementation(libs.androidx.test.core)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.androidx.compose.ui.test.junit4)
+                implementation(libs.androidx.compose.ui.test.manifest)
+            }
+        }
+        // ===== /tests =====
+
         getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
@@ -56,7 +85,6 @@ kotlin {
                 implementation(libs.androidx.lifecycle.runtime.compose)
                 implementation(libs.compose.material.icons.extended)  // icons for desktop/others
                 implementation(libs.multiplatform.settings)
-                implementation("com.google.accompanist:accompanist-drawablepainter:0.37.3")
                 kotlin.srcDir(layout.buildDirectory.dir("generated/source/kmp/main/kotlin"))
                 implementation(project(":soboAppTpl", ""))
                 // Add other common dependencies (e.g., kotlinx.serialization if needed)
@@ -64,6 +92,8 @@ kotlin {
         }
         getByName("androidMain") {
             dependencies {
+                // Android-only library - must not be in commonMain (breaks the desktop test classpath)
+                implementation("com.google.accompanist:accompanist-drawablepainter:0.37.3")
                 implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.androidx.activity.compose)
 
